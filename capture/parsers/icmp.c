@@ -30,6 +30,8 @@ LOCAL int                    icmpv6MProtocol;
 
 LOCAL int                    icmpTypeField;
 LOCAL int                    icmpCodeField;
+LOCAL int                    icmpPayloadSrcIp;
+LOCAL int                    icmpPayloadDstIp;
 
 
 /******************************************************************************/
@@ -91,6 +93,7 @@ void icmp_pre_process(MolochSession_t *session, MolochPacket_t * const packet, i
     if (ip4->ip_v == 4) {
         dir = (MOLOCH_V6_TO_V4(session->addr1) == ip4->ip_src.s_addr &&
                MOLOCH_V6_TO_V4(session->addr2) == ip4->ip_dst.s_addr);
+
     } else {
         dir = (memcmp(session->addr1.s6_addr, ip6->ip6_src.s6_addr, 16) == 0 &&
                memcmp(session->addr2.s6_addr, ip6->ip6_dst.s6_addr, 16) == 0);
@@ -108,6 +111,28 @@ int icmp_process(MolochSession_t *session, MolochPacket_t * const packet)
         moloch_field_int_add(icmpTypeField, session, data[0]);
         moloch_field_int_add(icmpCodeField, session, data[1]);
     }
+
+    switch (data[0]) {
+      case 3:
+      case 11:
+        if (packet->payloadLen >= 2) {
+          char srcip[32];
+          char dstip[32];
+
+          sprintf (srcip, "%d.%d.%d.%d", packet->pkt[58-4], packet->pkt[59-4], packet->pkt[60-4], packet->pkt[61-4]);
+          moloch_field_string_add(icmpPayloadSrcIp, session, srcip, -1, TRUE);
+
+          sprintf (dstip, "%d.%d.%d.%d", packet->pkt[62-4], packet->pkt[63-4], packet->pkt[64-4], packet->pkt[65-4]);
+          moloch_field_string_add(icmpPayloadDstIp, session, dstip, -1, TRUE);
+        } else {
+          moloch_field_string_add(icmpPayloadSrcIp, session, "error", -1, TRUE);
+          moloch_field_string_add(icmpPayloadDstIp, session, "error", -1, TRUE);
+        }
+				break;
+      default:
+        LOG("processing icmp type not known %d", data[0]);
+    }
+
     return 1;
 }
 /******************************************************************************/
@@ -125,6 +150,8 @@ void icmpv6_pre_process(MolochSession_t *session, MolochPacket_t * const packet,
 
     if (isNewSession)
         moloch_session_add_protocol(session, "icmp");
+
+    session->midSave = 1;
 
     int dir = (memcmp(session->addr1.s6_addr, ip6->ip6_src.s6_addr, 16) == 0 &&
                memcmp(session->addr2.s6_addr, ip6->ip6_dst.s6_addr, 16) == 0);
@@ -164,4 +191,15 @@ void moloch_parser_init()
         MOLOCH_FIELD_TYPE_INT_GHASH, 0,
         (char *)NULL);
 
+    icmpPayloadSrcIp = moloch_field_define("general", "lotermfield",
+        "icmp.payload.srcip", "ICMP payload src IP", "icmp.payload.srcip",
+        "ICMP payload src IP values",
+        MOLOCH_FIELD_TYPE_STR_GHASH, 0,
+        (char *)NULL);
+
+    icmpPayloadDstIp = moloch_field_define("general", "lotermfield",
+        "icmp.payload.dstip", "ICMP payload dst IP", "icmp.payload.dstip",
+        "ICMP payload dst IP values",
+        MOLOCH_FIELD_TYPE_STR_GHASH, 0,
+        (char *)NULL);
 }
