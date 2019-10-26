@@ -115,22 +115,22 @@ int icmp_process(MolochSession_t *session, MolochPacket_t * const packet)
     switch (data[0]) {
       case 3:
       case 11:
-        if (packet->payloadLen >= 2) {
+				LOG("packet paylaodlen=%d", packet->payloadLen);
+				// icmp header (8) + ip header (20) + proto header (8)
+        if (packet->payloadLen >= 36) {
           char srcip[32];
           char dstip[32];
 
-          sprintf (srcip, "%d.%d.%d.%d", packet->pkt[58-4], packet->pkt[59-4], packet->pkt[60-4], packet->pkt[61-4]);
+          sprintf (srcip, "%d.%d.%d.%d", packet->pkt[58-4], packet->pkt[55], packet->pkt[56], packet->pkt[57]);
           moloch_field_string_add(icmpPayloadSrcIp, session, srcip, -1, TRUE);
 
-          sprintf (dstip, "%d.%d.%d.%d", packet->pkt[62-4], packet->pkt[63-4], packet->pkt[64-4], packet->pkt[65-4]);
+          sprintf (dstip, "%d.%d.%d.%d", packet->pkt[58], packet->pkt[59], packet->pkt[60], packet->pkt[61]);
           moloch_field_string_add(icmpPayloadDstIp, session, dstip, -1, TRUE);
         } else {
           moloch_field_string_add(icmpPayloadSrcIp, session, "error", -1, TRUE);
           moloch_field_string_add(icmpPayloadDstIp, session, "error", -1, TRUE);
         }
 				break;
-      default:
-        LOG("processing icmp type not known %d", data[0]);
     }
 
     return 1;
@@ -191,13 +191,13 @@ void moloch_parser_init()
         MOLOCH_FIELD_TYPE_INT_GHASH, 0,
         (char *)NULL);
 
-    icmpPayloadSrcIp = moloch_field_define("general", "lotermfield",
+    icmpPayloadSrcIp = moloch_field_define("general", "ip",
         "icmp.payload.srcip", "ICMP payload src IP", "icmp.payload.srcip",
         "ICMP payload src IP values",
         MOLOCH_FIELD_TYPE_STR_GHASH, 0,
         (char *)NULL);
 
-    icmpPayloadDstIp = moloch_field_define("general", "lotermfield",
+    icmpPayloadDstIp = moloch_field_define("general", "ip",
         "icmp.payload.dstip", "ICMP payload dst IP", "icmp.payload.dstip",
         "ICMP payload dst IP values",
         MOLOCH_FIELD_TYPE_STR_GHASH, 0,
